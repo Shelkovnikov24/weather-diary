@@ -4,64 +4,67 @@ import json
 import os
 from datetime import datetime
 
-DATA_FILE = "expenses.json"
+DATA_FILE = "weather.json"
 
-class ExpenseTracker:
+class WeatherDiaryApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Трекер расходов")
+        self.root.title("Дневник погоды")
         self.root.geometry("650x550")
         
-        self.expenses = self.load_data()
+        self.records = self.load_data()
         
         # --- Форма добавления ---
-        frame_add = tk.LabelFrame(root, text="Добавить расход")
+        frame_add = tk.LabelFrame(root, text="Добавить запись")
         frame_add.pack(padx=10, pady=10, fill="x")
         
-        tk.Label(frame_add, text="Сумма:").grid(row=0, column=0, padx=5, pady=5)
-        self.entry_amount = tk.Entry(frame_add, width=15)
-        self.entry_amount.grid(row=0, column=1, padx=5, pady=5)
-        
-        tk.Label(frame_add, text="Категория:").grid(row=0, column=2, padx=5, pady=5)
-        self.combo_category = ttk.Combobox(frame_add, values=["Еда", "Транспорт", "Развлечения", "Счета", "Другое"], width=15)
-        self.combo_category.grid(row=0, column=3, padx=5, pady=5)
-        self.combo_category.current(0)
-        
-        tk.Label(frame_add, text="Дата (ГГГГ-ММ-ДД):").grid(row=1, column=0, padx=5, pady=5)
-        self.entry_date = tk.Entry(frame_add, width=15)
+        tk.Label(frame_add, text="Дата (ГГГГ-ММ-ДД):").grid(row=0, column=0, padx=5, pady=5)
+        self.entry_date = tk.Entry(frame_add, width=12)
         self.entry_date.insert(0, datetime.now().strftime("%Y-%m-%d"))
-        self.entry_date.grid(row=1, column=1, padx=5, pady=5)
+        self.entry_date.grid(row=0, column=1, padx=5, pady=5)
         
-        tk.Button(frame_add, text="Добавить", command=self.add_expense, bg="#4CAF50", fg="white").grid(row=1, column=2, columnspan=2, pady=5, sticky="we", padx=5)
+        tk.Label(frame_add, text="Температура (°C):").grid(row=0, column=2, padx=5, pady=5)
+        self.entry_temp = tk.Entry(frame_add, width=10)
+        self.entry_temp.grid(row=0, column=3, padx=5, pady=5)
+
+        tk.Label(frame_add, text="Осадки:").grid(row=0, column=4, padx=5, pady=5)
+        self.combo_precip = ttk.Combobox(frame_add, values=["Нет", "Да"], width=5)
+        self.combo_precip.current(0)
+        self.combo_precip.grid(row=0, column=5, padx=5, pady=5)
         
-        # --- Фильтрация и подсчет (ОБНОВЛЕНО) ---
-        frame_filter = tk.LabelFrame(root, text="Фильтр и аналитика")
+        tk.Label(frame_add, text="Описание погоды:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        self.entry_desc = tk.Entry(frame_add, width=30)
+        self.entry_desc.grid(row=1, column=1, columnspan=3, padx=5, pady=5, sticky="w")
+        
+        tk.Button(frame_add, text="Добавить запись", command=self.add_record, bg="#4CAF50", fg="white").grid(row=1, column=4, columnspan=2, pady=5, sticky="we", padx=5)
+        
+        # --- Фильтрация ---
+        frame_filter = tk.LabelFrame(root, text="Фильтр записей")
         frame_filter.pack(padx=10, pady=5, fill="x")
         
-        tk.Label(frame_filter, text="Категория:").grid(row=0, column=0, padx=5, pady=5)
-        self.filter_category = ttk.Combobox(frame_filter, values=["Все", "Еда", "Транспорт", "Развлечения", "Счета", "Другое"], width=15)
-        self.filter_category.current(0)
-        self.filter_category.grid(row=0, column=1, padx=5, pady=5)
+        tk.Label(frame_filter, text="Дата:").grid(row=0, column=0, padx=5, pady=5)
+        self.filter_date = tk.Entry(frame_filter, width=12)
+        self.filter_date.grid(row=0, column=1, padx=5, pady=5)
         
-        tk.Button(frame_filter, text="Применить фильтр", command=self.update_table).grid(row=0, column=2, columnspan=2, padx=10, sticky="we")
-
-        tk.Label(frame_filter, text="Дата с:").grid(row=1, column=0, padx=5, pady=5)
-        self.filter_date_start = tk.Entry(frame_filter, width=15)
-        self.filter_date_start.grid(row=1, column=1, padx=5, pady=5)
-
-        tk.Label(frame_filter, text="Дата по:").grid(row=1, column=2, padx=5, pady=5)
-        self.filter_date_end = tk.Entry(frame_filter, width=15)
-        self.filter_date_end.grid(row=1, column=3, padx=5, pady=5)
+        tk.Label(frame_filter, text="Температура выше (°C):").grid(row=0, column=2, padx=5, pady=5)
+        self.filter_temp = tk.Entry(frame_filter, width=10)
+        self.filter_temp.grid(row=0, column=3, padx=5, pady=5)
         
-        self.label_total = tk.Label(frame_filter, text="Итого за период: 0.00 руб.", font=("Arial", 11, "bold"))
-        self.label_total.grid(row=2, column=0, columnspan=4, pady=5)
+        tk.Button(frame_filter, text="Применить", command=self.update_table).grid(row=0, column=4, padx=5)
+        tk.Button(frame_filter, text="Сбросить", command=self.reset_filter).grid(row=0, column=5, padx=5)
 
         # --- Таблица ---
-        columns = ("amount", "category", "date")
+        columns = ("date", "temp", "desc", "precip")
         self.tree = ttk.Treeview(root, columns=columns, show="headings")
-        self.tree.heading("amount", text="Сумма (руб.)")
-        self.tree.heading("category", text="Категория")
         self.tree.heading("date", text="Дата")
+        self.tree.heading("temp", text="Температура (°C)")
+        self.tree.heading("desc", text="Описание")
+        self.tree.heading("precip", text="Осадки")
+        
+        self.tree.column("date", width=100)
+        self.tree.column("temp", width=120)
+        self.tree.column("desc", width=250)
+        self.tree.column("precip", width=80)
         self.tree.pack(padx=10, pady=10, fill="both", expand=True)
         
         self.update_table()
@@ -77,74 +80,72 @@ class ExpenseTracker:
 
     def save_data(self):
         with open(DATA_FILE, "w", encoding="utf-8") as file:
-            json.dump(self.expenses, file, ensure_ascii=False, indent=4)
+            json.dump(self.records, file, ensure_ascii=False, indent=4)
 
-    def add_expense(self):
-        amount_str = self.entry_amount.get()
-        category = self.combo_category.get()
+    def add_record(self):
         date_str = self.entry_date.get()
+        temp_str = self.entry_temp.get()
+        desc = self.entry_desc.get().strip()
+        precip = self.combo_precip.get()
         
-        try:
-            amount = float(amount_str)
-            if amount <= 0:
-                raise ValueError
-        except ValueError:
-            messagebox.showerror("Ошибка", "Сумма должна быть положительным числом (например, 150.50)!")
-            return
-            
+        # Валидация даты
         try:
             datetime.strptime(date_str, "%Y-%m-%d")
         except ValueError:
-            messagebox.showerror("Ошибка", "Неверный формат даты! Используйте ГГГГ-ММ-ДД (например, 2026-04-29).")
+            messagebox.showerror("Ошибка", "Неверный формат даты! Используйте ГГГГ-ММ-ДД.")
             return
             
-        self.expenses.append({"amount": amount, "category": category, "date": date_str})
+        # Валидация температуры
+        try:
+            temp = float(temp_str)
+        except ValueError:
+            messagebox.showerror("Ошибка", "Температура должна быть числом (например, 15.5 или -5)!")
+            return
+            
+        # Валидация описания
+        if not desc:
+            messagebox.showerror("Ошибка", "Описание погоды не может быть пустым!")
+            return
+            
+        self.records.append({"date": date_str, "temp": temp, "desc": desc, "precip": precip})
         self.save_data()
         self.update_table()
-        self.entry_amount.delete(0, tk.END)
-        messagebox.showinfo("Успех", "Запись успешно добавлена!")
+        self.entry_desc.delete(0, tk.END)
+        self.entry_temp.delete(0, tk.END)
+        messagebox.showinfo("Успех", "Запись о погоде успешно добавлена!")
+
+    def reset_filter(self):
+        self.filter_date.delete(0, tk.END)
+        self.filter_temp.delete(0, tk.END)
+        self.update_table()
 
     def update_table(self):
         for item in self.tree.get_children():
             self.tree.delete(item)
             
-        filter_cat = self.filter_category.get()
-        start_date_str = self.filter_date_start.get().strip()
-        end_date_str = self.filter_date_end.get().strip()
+        f_date = self.filter_date.get().strip()
+        f_temp_str = self.filter_temp.get().strip()
         
-        start_date = None
-        end_date = None
-        
-        if start_date_str:
-            try: start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
-            except ValueError: pass 
-            
-        if end_date_str:
-            try: end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
-            except ValueError: pass
-
-        total = 0.0
-        
-        for exp in self.expenses:
-            cat_match = (filter_cat == "Все" or exp["category"] == filter_cat)
-            date_match = True
-            
+        f_temp = None
+        if f_temp_str:
             try:
-                exp_date = datetime.strptime(exp["date"], "%Y-%m-%d")
-                if start_date and exp_date < start_date:
-                    date_match = False
-                if end_date and exp_date > end_date:
-                    date_match = False
+                f_temp = float(f_temp_str)
             except ValueError:
-                pass 
-
-            if cat_match and date_match:
-                self.tree.insert("", "end", values=(f"{exp['amount']:.2f}", exp["category"], exp["date"]))
-                total += float(exp["amount"])
+                pass # Если в фильтр ввели не число, игнорируем
+        
+        for rec in self.records:
+            match_date = True
+            match_temp = True
+            
+            if f_date and rec["date"] != f_date:
+                match_date = False
+            if f_temp is not None and float(rec["temp"]) <= f_temp:
+                match_temp = False
                 
-        self.label_total.config(text=f"Итого за период: {total:.2f} руб.")
+            if match_date and match_temp:
+                self.tree.insert("", "end", values=(rec["date"], f"{rec['temp']} °C", rec["desc"], rec["precip"]))
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = ExpenseTracker(root)
+    app = WeatherDiaryApp(root)
     root.mainloop()
